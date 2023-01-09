@@ -62,11 +62,14 @@ typedef struct
 } Player;
 
 void mainMenu(Card *pHand, Card *dHand, Info *info);
-void gameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][22]);
+void gameLogic(Card *pHand, Card *dHand, Info *info);
 void splitGameLogic(Card *pHand, Card *dHand, Info *info, int *aceIndex);
 
-void draw(Card *hand, int index, int aceIndex[][22], int *total, int player);
-void FirstTwoDraws(Card *hand, int aceIndex[][22], int *total, int player);
+void hitLogic(Card *pHadn, Info *info, int aceIndex[][MAX_DECK], int *endGame);
+void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK], int *endGame);
+
+void draw(Card *hand, int index, int aceIndex[][MAX_DECK], int *total, int player);
+void FirstTwoDraws(Card *hand, int aceIndex[][MAX_DECK], int *total, int player);
 
 void checkWinner(int total, int kTotal, int *endGame);
 void checkIfBlackJack(int total, int kTotal, int *endGame);
@@ -87,12 +90,6 @@ int main()
     Card pHand[MAX_DECK];  
     Card dHand[MAX_DECK];
 
-
-// Zainicjować dane struktury i zamiast podawani 4 arguentow przekazac wskaźniki na strukture !!!!!!!!!!
-
-    int i = 2, j = 2; 
-    int total = 0, kTotal = 0;
-
     system("clear");
     mainMenu(pHand, dHand, &info);
 
@@ -110,21 +107,15 @@ void mainMenu(Card *pHand, Card *dHand, Info *info)
         printf("2 - Players stats \n");
         printf("3 - Exit \n");
 
-       k = getchar();
+        //k = getchar();
+
+        scanf(" %c", &k);
 
         switch (k)
         {
             case '1':
                 system("clear");
-                info->dIndex = 2;
-                info->pIndex = 2;
-                info->pTotal = 0;
-                info->dTotal = 0;
-                info->splited = 0;
-
-                int aceIndex[2][MAX_DECK]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-                
-                gameLogic(pHand, dHand, info, aceIndex);
+                gameLogic(pHand, dHand, info);
                 break;
             case '3':
                 end = 0;
@@ -134,41 +125,35 @@ void mainMenu(Card *pHand, Card *dHand, Info *info)
     }
 }
 
-void gameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][22])
+void gameLogic(Card *pHand, Card *dHand, Info *info)
 {
     int endGame = 1;
     char c;
+    int aceIndex[2][MAX_DECK]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 
+    // funkcja na inicjalizacje zmiennych
+    info->dIndex = 2;
+    info->pIndex = 2;
+    info->pTotal = 0;
+    info->dTotal = 0;
+    info->splited = 0;
+                
     FirstTwoDraws(pHand, aceIndex, &info->pTotal, PLAYER);
     FirstTwoDraws(dHand, aceIndex, &info->dTotal, DEALER);
 
     checkIfBlackJack(info->pTotal, info->dTotal, &endGame);
-    //printTable(pHand, dHand, total, kTotal - dHand[1].value, i, j, PLAYER, splited);
 
     while (endGame)
     {
-        scanf("%c", &c);
+        scanf(" %c", &c);
 
         switch(c)
         {
             case 'h':
-                draw(pHand, info->pIndex, aceIndex, &info->pTotal, PLAYER);
-                info->pIndex += 1;
-                info->splited = 1;
-                if (info->pTotal > BLACKJACK)
-                {
-                    printf("You Lost \n");
-                    endGame = 0;
-                    break;
-                }
+                hitLogic(pHand, info, aceIndex, &endGame);
                 break;
             case 's':
-                while (info->dTotal < 17)
-                {
-                    draw(dHand, info->dIndex, aceIndex, &info->dTotal, DEALER);
-                    info->dIndex++;
-                }
-                checkWinner(info->pTotal, info->dTotal, &endGame);
+                standLogic(dHand, info, aceIndex, &endGame);
                 break;
             /*case 'p':
                 if (pHand[0].face == pHand[1].face && splited == 0)
@@ -286,7 +271,7 @@ void splitGameLogic(Card *pHand, Card *dHand, Info *info, int *aceIndex)
     checkWinner(totalTwo, kTotal, &endGameTwo);
 }
 */
-void draw(Card *hand, int index, int aceIndex[][22] ,int *total, int player)
+void draw(Card *hand, int index, int aceIndex[][MAX_DECK] ,int *total, int player)
 {
     // ran = 0 is Ace ran > 10 cards with 10 points
     int ran = rand() % 13;
@@ -324,7 +309,7 @@ void draw(Card *hand, int index, int aceIndex[][22] ,int *total, int player)
     }   
 }
 
-void FirstTwoDraws(Card *hand,int aceIndex[][22], int *total, int player)
+void FirstTwoDraws(Card *hand,int aceIndex[][MAX_DECK], int *total, int player)
 {
     for (int i = 0; i < 2; i++)
         draw(hand, i, aceIndex, total, player);
@@ -364,6 +349,27 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame)
     }
 }
 
+void hitLogic(Card *pHand, Info *info, int aceIndex[][MAX_DECK], int *endGame)
+{
+    draw(pHand, info->pIndex, aceIndex, &info->pTotal, PLAYER);
+    info->pIndex++;
+    info->splited = 1;
+    if (info->pTotal > BLACKJACK)
+    {
+        printf("You Lost \n");
+        *endGame = 0;
+    }
+}
+
+void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK], int *endGame)
+{
+    while (info->dTotal < 17)
+    {
+        draw(dHand, info->dIndex, aceIndex, &info->dTotal, DEALER);
+        info->dIndex++;
+    }
+    checkWinner(info->pTotal, info->dTotal, endGame);
+}
 /*
 void printHand(Card *hand, int cardAmount)
 {
