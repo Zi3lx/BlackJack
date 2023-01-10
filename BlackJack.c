@@ -50,6 +50,14 @@ typedef struct
 
 typedef struct 
 {
+    char name[30];
+    int money;
+} Player;
+
+typedef struct 
+{
+    Player player;
+
     int pIndex;
     int dIndex;
     int pTotal;
@@ -57,14 +65,8 @@ typedef struct
     int splited;
 } Info;
 
-typedef struct 
-{
-    char name[30];
-    int money;
-} Player;
-
-void mainMenu(Card *pHand, Card *dHand, Info *info);
-void gameLogic(Card *pHand, Card *dHand, Info *info);
+void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player);
+void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player);
 void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]);
 
 void hitLogic(Card *pHadn, Info *info, int aceIndex[][MAX_DECK], int *endGame);
@@ -75,10 +77,46 @@ void FirstTwoDraws(Card *hand, int aceIndex[][MAX_DECK], int *total, int player)
 
 void checkWinner(int total, int kTotal);
 void checkIfBlackJack(int total, int kTotal, int *endGame);
+
 void printHand(Card *hand, int cardAmount);
 void printTable(Card *pHand, Card *dHand, Info *info, int player);
 
 char getch();
+
+void login(Info *info)
+{
+    int logged = 1;
+    FILE *file = fopen("players.txt", "a");
+    int c;
+    
+    while (logged)
+    {
+        printf("1 - Log in \n");
+        printf("2 - Register \n");
+        printf("3 - Back \n");
+
+        scanf(" %d", &c);
+
+        switch(c)
+        {
+            case 1:
+                printf("%s", info->player.name);
+                logged = 0;
+                break;
+            case 2:
+                printf("Write your name (max 30 characters)\n");
+                scanf("%s", info->player.name);
+                info->player.money = 1000;
+                fprintf(file, "%s %d \n", info->player.name, info->player.money);
+                logged = 0;
+                break;
+            case 3:
+                logged = 0;
+                break;
+        }
+    }    
+    fclose(file);
+}
 
 
 int main()
@@ -93,15 +131,17 @@ int main()
     Card dHand[MAX_DECK];
 
     system("clear");
-    mainMenu(pHand, dHand, &info);
+    mainMenu(pHand, dHand, &info, &player);
 
     return 0;
 }
 
-void mainMenu(Card *pHand, Card *dHand, Info *info)
+void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player)
 {
     int end = 1;
     char k;
+
+    login(info);
 
     while (end)
     {   
@@ -115,7 +155,7 @@ void mainMenu(Card *pHand, Card *dHand, Info *info)
         {
             case '1':
                 system("clear");
-                gameLogic(pHand, dHand, info);
+                gameLogic(pHand, dHand, info, player);
                 break;
             case '3':
                 end = 0;
@@ -128,7 +168,7 @@ void mainMenu(Card *pHand, Card *dHand, Info *info)
     }
 }
 
-void gameLogic(Card *pHand, Card *dHand, Info *info)
+void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
 {
     int endGame = 1;
     char c;
@@ -163,7 +203,7 @@ void gameLogic(Card *pHand, Card *dHand, Info *info)
                 endGame = 0;
                 break;
             case 'p':
-                if (pHand[0].face == pHand[1].face && info->splited == 0)
+                if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
                 {
                     info->splited = 1;
                     splitGameLogic(pHand, dHand, info, aceIndex);
