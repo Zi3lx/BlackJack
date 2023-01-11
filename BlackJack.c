@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
+#include <string.h>
 
 /*
 X warunek ze dealer przegrywa jak ma więcej niż 21
@@ -61,11 +62,15 @@ typedef struct
     Player player;
 
     int moneyBet;
+
     int pIndex;
-    int dIndex;
     int pTotal;
+
+    int dIndex;
     int dTotal;
+
     int splited;
+    int splitGame;
 } Info;
 
 void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player);
@@ -73,6 +78,7 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player);
 void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]);
 void login(Info *info);
 
+void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK], int endGame);
 void hitLogic(Card *pHadn, Info *info, int aceIndex[][MAX_DECK], int *endGame);
 void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK]);
 
@@ -148,23 +154,121 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
 {
     //Variables initialization
     int endGame = 1;
-    char c;
     int aceIndex[2][MAX_DECK]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     structVariablesInit(info);
 
+    printf("MONEY: %d\n", info->player.money);
     checkBetMoney(info);
 
+    //First to cards for player and dealer
     FirstTwoDraws(pHand, aceIndex, &info->pTotal, PLAYER);
     FirstTwoDraws(dHand, aceIndex, &info->dTotal, DEALER);
-
     checkIfBlackJack(info->pTotal, info->dTotal, &endGame, info);
 
+    mainGameLoop(pHand, dHand, info, aceIndex, endGame);
+
+    printTable(pHand, dHand, info, DEALER);
+    checkWinner(info->pTotal, info->dTotal, info);
+}
+
+void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK])
+{
+    system("clear");
+
+    char c;
+    int helpVar;
+    int endGame;
+    int copyOfFirst = pHand[1].value;
+
+    //First Split Game
+    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
+    printTable(pHand, dHand, info, PLAYER);
+
+    mainGameLoop(pHand, dHand, info, aceIndex, endGame);
+    
+    int total = info->pTotal;
+    printTable(pHand, dHand, info, DEALER);
+
+    //Second Split Game
+    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
+    printTable(pHand, dHand, info, PLAYER);
+
+    mainGameLoop(pHand, dHand, info, aceIndex, endGame);
+
+    printTable(pHand, dHand, info, DEALER);
+    checkSplitWinners(total, info);
+}
+
+void login(Info *info)
+{
+    int logged = 1;
+    int c;
+    int moneyInFile;
+    char username[30];
+    int compareResult;
+    FILE *file = fopen("players.txt", "a");
+    FILE *r_file = fopen("results.txt", "r");
+
+    while (logged)
+    {
+        printf("1 - Log in \n");
+        printf("2 - Register \n");
+        printf("3 - Exit \n");
+
+        scanf(" %d", &c);
+
+        switch(c)
+        {
+            system("clear");
+
+            case 1:
+                if (r_file == NULL)
+                    printf("asdadasd");
+                
+                printf("Write your name (max 30 characters) no spaces \n");
+                scanf("%s", info->player.name);
+
+                while (fscanf(r_file, "%s %d", username, &moneyInFile) == 2)
+                {
+                    printf("%s %d \n", username, moneyInFile);
+                    compareResult = strcmp(username, info->player.name);
+                    if (compareResult == 0)
+                    {
+                        printf("You have logged in \n");
+                        info->player.money = moneyInFile;
+                        logged = 0;
+                        break;
+                    }
+                }
+                if (compareResult != 1)
+                    printf("You are here for the first time, try to register \n");
+                sleep(2);
+                break;
+            case 2:
+                printf("Write your name (max 30 characters) no spaces \n");
+                scanf("%29s", info->player.name);
+                info->player.money = 1000;
+                fprintf(file, "%s \n", info->player.name);
+                logged = 0;
+                break;
+            case 3:
+                exit(1);
+                break;
+        }
+    }    
+    fclose(r_file);
+    fclose(file);
+}
+
+void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK], int endGame)
+{
+    char c;
     printTable(pHand, dHand, info, PLAYER);
 
     while (endGame)
     {
-        printf("MONEY: %d\n", info->player.money);
         c = getch();
+
         switch(c)
         {
             case 'h':
@@ -172,8 +276,16 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
                 printTable(pHand, dHand, info, PLAYER);
                 break;
             case 's':
-                standLogic(dHand, info, aceIndex);
-                endGame = 0;
+                if (info->splited == 1 && info->splitGame == 0)
+                {
+                    standLogic(dHand, info, aceIndex);
+                    endGame = 0;
+                }
+                else 
+                {
+                    info->splitGame = 1;
+                    endGame = 0;
+                }
                 break;
             case 'p':
                 if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
@@ -189,98 +301,6 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
         }
         //devInfo(aceIndex, info, pHand, dHand);
     }
-    printTable(pHand, dHand, info, DEALER);
-    checkWinner(info->pTotal, info->dTotal, info);
-    //printf("MONEY: %d\n", info->player.money);
-}
-
-void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK])
-{
-    system("clear");
-
-    char c;
-    int helpVar;
-    int endGame;
-    int copyOfFirst = pHand[1].value;
-
-    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
-    printTable(pHand, dHand, info, PLAYER);
-    while (endGame)
-    {
-        scanf(" %c", &c);
-
-        switch(c)
-        {
-            case 'h':
-                hitLogic(pHand, info, aceIndex, &endGame);
-                break;
-            case 's':
-                endGame = 0;
-                break;
-        }
-        //devInfo(aceIndex, info, pHand, dHand);
-        printTable(pHand, dHand, info, PLAYER);
-    }
-    
-    int total = info->pTotal;
-    printTable(pHand, dHand, info, DEALER);
-
-    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
-    printTable(pHand, dHand, info, PLAYER);
-    while (endGame)
-    {
-        scanf(" %c", &c);
-
-        switch(c)
-        {
-            case 'h':
-                hitLogic(pHand, info, aceIndex, &endGame);
-                break;
-            case 's':
-                standLogic(dHand, info, aceIndex);
-                endGame = 0;
-                break;
-        }
-        //devInfo(aceIndex, info, pHand, dHand);
-        printTable(pHand, dHand, info, PLAYER);
-    }
-    printTable(pHand, dHand, info, PLAYER);
-    checkSplitWinners(total, info);
-}
-
-void login(Info *info)
-{
-    int logged = 1;
-    FILE *file = fopen("players.txt", "a");
-    int c;
-    
-    while (logged)
-    {
-        printf("1 - Log in \n");
-        printf("2 - Register \n");
-        printf("3 - Exit \n");
-
-        scanf(" %d", &c);
-
-        switch(c)
-        {
-            case 1:
-                printf("%s", info->player.name);
-                logged = 0;
-                break;
-            case 2:
-                printf("Write your name (max 30 characters)\n");
-                scanf("%s", info->player.name);
-                info->player.money = 1000;
-                fprintf(file, "%s \n", info->player.name);
-                logged = 0;
-                break;
-            case 3:
-                exit(1);
-                break;
-        }
-    }    
-    fclose(file);
 }
 
 void hitLogic(Card *pHand, Info *info, int aceIndex[][MAX_DECK], int *endGame)
@@ -351,33 +371,33 @@ void checkWinner(int total, int dTotal, Info *info)
 {
     if (info->pTotal > BLACKJACK)
     {
-        printf("You Bust, dealer wins. You lose %d$\n", info->moneyBet);
+        printf("You Bust with %d points, dealer wins. You lose %d$\n", total, info->moneyBet);
         info->player.money -= info->moneyBet;
     }
     else if (total <= BLACKJACK && dTotal > BLACKJACK)
     {
-        printf("You Win, you earn %d$ \n", info->moneyBet);
+        printf("You Win with %d points, you earn %d$ \n", total, info->moneyBet);
         info->player.money += info->moneyBet;
     }
     else if (total > dTotal)
     {
-        printf("You Win, you earn %d$ \n", info->moneyBet);
+        printf("You Win with %d points, you earn %d$ \n", total, info->moneyBet);
         info->player.money += info->moneyBet;
     }
     else if (total < dTotal)
     {   
-        printf("You Lost, you lose %d$ \n", info->moneyBet);
+        printf("You Lost with %d points, you lose %d$ \n", total, info->moneyBet);
         info->player.money -= info->moneyBet;
     }
     else if (total == dTotal)
     {
-        printf("You Draw, you earn 0$ \n");
+        printf("You Draw with %d points, you earn 0$ \n", total);
     }
 }
 
 void checkSplitWinners(int total, Info *info)
 {
-    system("clear");
+    printf("Dealer Points: %d\n", total);
     printf("First Game: \n");   
     checkWinner(total, info->dTotal, info);
     printf("Second Game: \n");   
@@ -480,6 +500,7 @@ void structVariablesInit(Info *info)
     info->pTotal = 0;
     info->dTotal = 0;
     info->splited = 0;
+    info->splitGame = 0;
 }
 
 void saveToFile(Info *info, int money)
