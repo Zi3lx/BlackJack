@@ -19,6 +19,8 @@ X naprawic funkcje sum dla asa
 X/O stworzyc opcje split i double down
 - ala logowanie informacje w pliku i informacje o kasie itp w nim
 - as przy splicie zostaje z wartoscia 1 zmienic
+- dodac sprawdanie czy mozna obstawic dan ilosc pieniedzy
+- dodac wyglad zeby jakos wyglada
 X uporzadkowac dunkcje i napsiac funckje na gre 
 
 X/O uporzadkowac kod 
@@ -80,21 +82,14 @@ void FirstTwoDraws(Card *hand, int aceIndex[][MAX_DECK], int *total, int player)
 void checkWinner(int total, int dTotal, Info *info);
 void checkSplitWinners(int total, Info *info);
 void checkIfBlackJack(int total, int dTotal, int *endGame, Info *info);
+void checkBetMoney(Info *info);
 
-void adminInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand);
+void devInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand);
+void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int copyOfFirst, int *endGame);
 void structVariablesInit(Info *info);
-void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int *copyOfFirst, int *endGame);
+void saveToFile(Info *info, int money);
 
-void saveToFile(Info *info, int money)
-{
-    FILE *file = fopen("results.txt", "a");
-
-    info->player.money = 1000;
-    fprintf(file, "%s %d\n", info->player.name, money);
-    fclose(file);
-}
-
-void printHand(Card *hand, int cardAmount);
+void printHand(Card *hand, int cardOnHand);
 void printTable(Card *pHand, Card *dHand, Info *info, int player);
 
 char getch();
@@ -157,17 +152,14 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
     int aceIndex[2][MAX_DECK]= {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
     structVariablesInit(info);
 
-
-    printf("How much do you wanna bet?\n");
-    scanf("%d", &info->moneyBet);
+    checkBetMoney(info);
 
     FirstTwoDraws(pHand, aceIndex, &info->pTotal, PLAYER);
     FirstTwoDraws(dHand, aceIndex, &info->dTotal, DEALER);
 
     checkIfBlackJack(info->pTotal, info->dTotal, &endGame, info);
 
-    for (int i = 0; i < info->pIndex; i++)
-        printf("%s ", pHand[i].face);
+    printTable(pHand, dHand, info, PLAYER);
 
     while (endGame)
     {
@@ -177,6 +169,7 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
         {
             case 'h':
                 hitLogic(pHand, info, aceIndex, &endGame);
+                printTable(pHand, dHand, info, PLAYER);
                 break;
             case 's':
                 standLogic(dHand, info, aceIndex);
@@ -190,10 +183,15 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
                     endGame = 0;
                 }
                 break;
+            default:
+                printTable(pHand, dHand, info, PLAYER);
+                break;
         }
-        adminInfo(aceIndex, info, pHand, dHand);
+        //devInfo(aceIndex, info, pHand, dHand);
     }
-    printf("MONEY: %d\n", info->player.money);
+    printTable(pHand, dHand, info, DEALER);
+    checkWinner(info->pTotal, info->dTotal, info);
+    //printf("MONEY: %d\n", info->player.money);
 }
 
 void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK])
@@ -203,9 +201,10 @@ void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DEC
     char c;
     int helpVar;
     int endGame;
+    int copyOfFirst = pHand[1].value;
 
-    resetSplitValues(aceIndex, pHand, info, &helpVar, &endGame);
-    printf("%s ", pHand[0].face);
+    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
+    printTable(pHand, dHand, info, PLAYER);
     while (endGame)
     {
         scanf(" %c", &c);
@@ -219,13 +218,15 @@ void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DEC
                 endGame = 0;
                 break;
         }
-        adminInfo(aceIndex, info, pHand, dHand);
+        //devInfo(aceIndex, info, pHand, dHand);
+        printTable(pHand, dHand, info, PLAYER);
     }
     
     int total = info->pTotal;
+    printTable(pHand, dHand, info, DEALER);
 
-    resetSplitValues(aceIndex, pHand, info, &helpVar, &endGame);
-    printf("%s ", pHand[0].face);
+    resetSplitValues(aceIndex, pHand, info, copyOfFirst, &endGame);
+    printTable(pHand, dHand, info, PLAYER);
     while (endGame)
     {
         scanf(" %c", &c);
@@ -240,8 +241,10 @@ void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DEC
                 endGame = 0;
                 break;
         }
-        adminInfo(aceIndex, info, pHand, dHand);
+        //devInfo(aceIndex, info, pHand, dHand);
+        printTable(pHand, dHand, info, PLAYER);
     }
+    printTable(pHand, dHand, info, PLAYER);
     checkSplitWinners(total, info);
 }
 
@@ -286,11 +289,7 @@ void hitLogic(Card *pHand, Info *info, int aceIndex[][MAX_DECK], int *endGame)
     info->pIndex++;
     info->splited = 1;
     if (info->pTotal > BLACKJACK)
-    {
-        printf("You Bust, dealer wins. You lose %d$\n", info->moneyBet);
-        info->player.money -= info->moneyBet;
         *endGame = 0;
-    }
 }
 
 void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK])
@@ -300,7 +299,6 @@ void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK])
         draw(dHand, info->dIndex, aceIndex, &info->dTotal, DEALER);
         info->dIndex++;
     }
-    checkWinner(info->pTotal, info->dTotal, info);
 }
 
 
@@ -351,9 +349,14 @@ void FirstTwoDraws(Card *hand,int aceIndex[][MAX_DECK], int *total, int player)
 
 void checkWinner(int total, int dTotal, Info *info)
 {
-    if (total <= BLACKJACK && dTotal > BLACKJACK)
+    if (info->pTotal > BLACKJACK)
     {
-        printf("You Win, you earn %d$\n", info->moneyBet);
+        printf("You Bust, dealer wins. You lose %d$\n", info->moneyBet);
+        info->player.money -= info->moneyBet;
+    }
+    else if (total <= BLACKJACK && dTotal > BLACKJACK)
+    {
+        printf("You Win, you earn %d$ \n", info->moneyBet);
         info->player.money += info->moneyBet;
     }
     else if (total > dTotal)
@@ -403,8 +406,27 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame, Info *info)
     }
 }
 
+void checkBetMoney(Info *info)
+{
+    while (1)
+    {
+        printf("How much do you wanna bet?\n");
+        scanf("%d", &info->moneyBet);
+        
+        if (info->player.money <=0)
+        {
+            printf("You dont have money\n");
+            exit(1);
+        }
+        else if (info->moneyBet <= info->player.money && info->moneyBet != 0 && info->moneyBet > 0)
+            break;
+        system("clear");
+        printf("Bet right amount?\n");
+    }
+}
 
-void adminInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand)
+
+void devInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand)
 {
     for (int i = 0; i < 22; i++)
     {
@@ -434,7 +456,7 @@ void adminInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand)
     printf("\n \n \n");
 }
 
-void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int *copyOfFirst, int *endGame)
+void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int copyOfFirst, int *endGame)
 {
     for (int i = 0; i < MAX_DECK; i++)
         aceIndex[PLAYER][i] = 0;
@@ -446,10 +468,9 @@ void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int *co
     }
 
     *endGame = 1;
-    copyOfFirst = &pHand[1].value;
     info->pIndex = 1;
-    info->pTotal = *copyOfFirst;
-    pHand[0].value = *copyOfFirst;
+    info->pTotal = copyOfFirst;
+    pHand[0].value = copyOfFirst;
 }
 
 void structVariablesInit(Info *info)
@@ -461,42 +482,55 @@ void structVariablesInit(Info *info)
     info->splited = 0;
 }
 
-
-/*
-void printHand(Card *hand, int cardAmount)
+void saveToFile(Info *info, int money)
 {
-    for (int i = 0; i < cardAmount; i++)
+    FILE *file = fopen("results.txt", "a");
+
+    info->player.money = 1000;
+    fprintf(file, "%s %d\n", info->player.name, money);
+    fclose(file);
+}
+
+
+void printHand(Card *hand, int cardOnHand)
+{
+    for (int i = 0; i < cardOnHand; i++)
         printf("%s ", hand[i].face);
     printf("\n");
 
-}*/
+}
 
-/*
-
-void printTable(Card *pHand, Card *dHand, Info *info, int player, int splited)
+void printTable(Card *pHand, Card *dHand, Info *info, int player)
 {
     system("clear");
-    printf("------------------------------------------------------------------ \n");
+    printf("------------------------ \u2660\u2665 BLACKJACK \u2663\u2666 ------------------------ \n");
     printf("Dealer Cards On Hand: ");
     if (player == PLAYER)
+    {
         printf("%s # \n", dHand[0].face);
+        printf("Total Dealer Points: %d \n", (info->dTotal - dHand[1].value));
+    }
     else 
-        printHand(dHand, kAmount);
-    printf("Total Dealer Points: %d \n", kTotal);
+    {
+        printHand(dHand, info->dIndex);
+        printf("Total Dealer Points: %d \n", info->dTotal);
+    }
     printf("\n \n \n");
 
-    printf("\t h - hit \t s - stand \t d - double \n");
-    if (pHand[0].face == pHand[1].face && splited == 0)
-        printf("\t\t\t p - split \n");
+    printf("\t\t\t h - hit \t s - stand \t \n");
+    if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
+        printf("\t\t\t\t p - split \n");
 
     printf("\n \n \n");
-    printf("Total Player Points: %d \n", total);
+    printf("Total Player Points: %d \n", info->pTotal);
     printf("Your Cards On Hand: ");
-    printHand(pHand, cAmount);
+    printHand(pHand, info->pIndex);
     printf("\n");
-    printf("------------------------------------------------------------------- \n");
+    printf("Money: %d                                         Money Bet: %d   \n", info->player.money, info->moneyBet);
+    printf("----------------------------------------------------------------- \n");
 } 
-*/
+
+
 char getch()
 {
     system ("/bin/stty raw");  
