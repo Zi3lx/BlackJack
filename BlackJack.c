@@ -3,9 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>
 #include <string.h>
-
+#include <unistd.h>
 /*
 X warunek ze dealer przegrywa jak ma więcej niż 21
 X opcja rozpoczęcia kolejnej tury bez wychodzenia z programu
@@ -18,10 +17,10 @@ X funkcje dla gameMenu
 X naprawic Asa by był 1 i 11
 X naprawic funkcje sum dla asa
 X/O stworzyc opcje split i double down
-- ala logowanie informacje w pliku i informacje o kasie itp w nim
-- as przy splicie zostaje z wartoscia 1 zmienic
-- dodac sprawdanie czy mozna obstawic dan ilosc pieniedzy
-- dodac wyglad zeby jakos wyglada
+X ala logowanie informacje w pliku i informacje o kasie itp w nim
+X naprawic as przy splicie zostaje z wartoscia 1 zmienic
+X dodac sprawdanie czy mozna obstawic dan ilosc pieniedzy
+X dodac wyglad zeby jakos wyglada
 X uporzadkowac dunkcje i napsiac funckje na gre 
 
 X/O uporzadkowac kod 
@@ -205,9 +204,13 @@ void login(Info *info)
     int c;
     int moneyInFile;
     char username[30];
-    int compareResult;
-    FILE *file = fopen("players.txt", "a");
     FILE *r_file = fopen("results.txt", "r");
+
+    if (r_file == NULL) 
+    {
+        printf("Error opening file, please make sure the file exists\n");
+        exit(1);
+    }
 
     while (logged)
     {
@@ -215,40 +218,39 @@ void login(Info *info)
         printf("2 - Register \n");
         printf("3 - Exit \n");
 
-        scanf(" %d", &c);
-
+        scanf("%d", &c);
+        system("clear");
         switch(c)
         {
-            system("clear");
-
             case 1:
-                if (r_file == NULL)
-                    printf("asdadasd");
-                
-                printf("Write your name (max 30 characters) no spaces \n");
-                scanf("%s", info->player.name);
-
+                printf("Write your name to login\n");
+                scanf("%29s", info->player.name);
+                int loggedIn = 0;
                 while (fscanf(r_file, "%s %d", username, &moneyInFile) == 2)
                 {
-                    printf("%s %d \n", username, moneyInFile);
-                    compareResult = strcmp(username, info->player.name);
-                    if (compareResult == 0)
+                    if (strcmp(info->player.name, username) == 0)
                     {
                         printf("You have logged in \n");
                         info->player.money = moneyInFile;
+                        fclose(r_file);
+                        loggedIn = 1;
                         logged = 0;
-                        break;
                     }
                 }
-                if (compareResult != 1)
+                if(loggedIn == 0)
                     printf("You are here for the first time, try to register \n");
-                sleep(2);
+                fclose(r_file);
                 break;
             case 2:
-                printf("Write your name (max 30 characters) no spaces \n");
+                printf("Write your name (max 30 characters min 3) no spaces \n");
                 scanf("%29s", info->player.name);
+                if(strlen(info->player.name)<3 || strlen(info->player.name)>30)
+                {
+                    printf("Invalid name length\n");
+                    break;
+                }
                 info->player.money = 1000;
-                fprintf(file, "%s \n", info->player.name);
+                saveToFile(info, info->player.money);
                 logged = 0;
                 break;
             case 3:
@@ -256,8 +258,6 @@ void login(Info *info)
                 break;
         }
     }    
-    fclose(r_file);
-    fclose(file);
 }
 
 void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK], int endGame)
@@ -276,7 +276,7 @@ void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]
                 printTable(pHand, dHand, info, PLAYER);
                 break;
             case 's':
-                if (info->splited == 1 && info->splitGame == 0)
+                if (info->splitGame == 0)
                 {
                     standLogic(dHand, info, aceIndex);
                     endGame = 0;
@@ -505,11 +505,30 @@ void structVariablesInit(Info *info)
 
 void saveToFile(Info *info, int money)
 {
-    FILE *file = fopen("results.txt", "a");
+    int moneyInFile;
+    char username[30];
+    int playerExist = 0;
+    FILE *file = fopen("results.txt", "r");
+    FILE *tempFile = fopen("temp.txt", "w");
 
-    info->player.money = 1000;
-    fprintf(file, "%s %d\n", info->player.name, money);
+    while (fscanf(file, "%s %d", username, &moneyInFile) == 2) 
+    {
+        if (strcmp(username, info->player.name) == 0) 
+        {
+            moneyInFile = money;
+            playerExist = 1;
+        }
+        fprintf(tempFile, "%s %d\n", username, moneyInFile);
+    }
+    if (!playerExist) 
+    {
+        fprintf(tempFile, "%s %d\n", info->player.name, money);
+    }
+    
     fclose(file);
+    fclose(tempFile);
+    remove("results.txt");
+    rename("temp.txt", "results.txt");
 }
 
 
