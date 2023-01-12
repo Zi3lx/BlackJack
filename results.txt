@@ -1,5 +1,6 @@
-asd 667
+asd 570
 aaa 1000
 janusz_uru 1000
 tututuutututut 1000
 qwer 999
+alfa 1000

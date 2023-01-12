@@ -16,15 +16,15 @@ X przegrana powinna być automatyczna jak będę miał więcej niż 21
 X funkcje dla gameMenu 
 X naprawic Asa by był 1 i 11
 X naprawic funkcje sum dla asa
-X/O stworzyc opcje split i double down
+X stworzyc opcje split
 X ala logowanie informacje w pliku i informacje o kasie itp w nim
 X naprawic as przy splicie zostaje z wartoscia 1 zmienic
 X dodac sprawdanie czy mozna obstawic dan ilosc pieniedzy
 X dodac wyglad zeby jakos wyglada
 X uporzadkowac dunkcje i napsiac funckje na gre 
 - statystyki dodac
-- walidacja register
-X/O uporzadkowac kod 
+X walidacja register
+X uporzadkowac kod 
 X stworzyc wyglad dla gry jak ponizej 
 
 ----------------------------------------
@@ -70,6 +70,7 @@ typedef struct
     int dIndex;
     int dTotal;
 
+    int checkNormalWin;
     int splited;
     int splitGame;
 } Info;
@@ -171,6 +172,7 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
     //First to cards for player and dealer
     FirstTwoDraws(pHand, aceIndex, &info->pTotal, PLAYER);
     FirstTwoDraws(dHand, aceIndex, &info->dTotal, DEALER);
+
     printTable(pHand, dHand, info, PLAYER);
     checkIfBlackJack(info->pTotal, info->dTotal, &endGame, info);
 
@@ -253,7 +255,9 @@ void registerLogic(Info *info, int *logged)
 
     printf("Write your name (max 30 characters min 3) no spaces \n");
     scanf("%s", info->player.name);
-    if (strlen(info->player.name)<3 || strlen(info->player.name)>MAX_LEN)
+
+    //Checking if input (name) is correct no psacess and 3 to 30 char
+    if (strlen(info->player.name) < 3 || strlen(info->player.name) > MAX_LEN)
     {
         printf("Invalid name length\n");
         return;
@@ -299,6 +303,8 @@ void login(Info *info, int *logged)
 
     printf("Write your name to login\n");
     scanf("%29s", info->player.name);
+
+    //Check if username is in file if yes you can login
     while (fscanf(r_file, "%s %d", username, &moneyInFile) == 2)
     {
         if (strcmp(info->player.name, username) == 0)
@@ -332,6 +338,7 @@ void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]
                 printTable(pHand, dHand, info, PLAYER);
                 break;
             case 's':
+                //If is for split and noral game else is for first split game so the dealer won't show his cards after first game 
                 if (info->splitGame == 0)
                 {
                     standLogic(dHand, info, aceIndex);
@@ -344,6 +351,7 @@ void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]
                 }
                 break;
             case 'p':
+                //Check if faces are equal or vaues and if game was already spliteds
                 if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
                 {
                     info->splited = 1;
@@ -380,13 +388,14 @@ void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK])
 
 void draw(Card *hand, int index, int aceIndex[][MAX_DECK] ,int *total, int player)
 {
-    // ran = 0 is Ace ran > 10 cards with 10 points
+    //Ran = 0 is Ace ran > 10 cards with 10 points
     int ran = rand() % 13;
 
     hand[index].face = face[ran];
     if(ran == 0)
     {
         hand[index].value = 11;
+        //Remember the ace position
         aceIndex[player][index] = 1;
     }
     else if (ran >= 10)
@@ -396,8 +405,7 @@ void draw(Card *hand, int index, int aceIndex[][MAX_DECK] ,int *total, int playe
 
     *total += hand[index].value;
 
-    //Check if ace is in hand
-    // Napisac funkcje na to 
+    //Checks if ace is in hand if so checks the total value is greater than 21 if so change ace value to 1
     if (*total > BLACKJACK)
     {
         for (int i = 0; i < MAX_DECK; i++)
@@ -425,6 +433,7 @@ void FirstTwoDraws(Card *hand,int aceIndex[][MAX_DECK], int *total, int player)
 
 void checkWinner(int total, int dTotal, Info *info)
 {
+    //Checks all game options to win or lose
     if (info->pTotal > BLACKJACK)
     {
         printf("You Bust with %d points, dealer wins. You lose %d$\n", total, info->moneyBet);
@@ -537,6 +546,7 @@ void devInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand)
 
 void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int copyOfFirst, int *endGame)
 {
+    //This function prepare values for split game 
     for (int i = 0; i < MAX_DECK; i++)
         aceIndex[PLAYER][i] = 0;
 
@@ -559,6 +569,7 @@ void structVariablesInit(Info *info)
     info->pTotal = 0;
     info->dTotal = 0;
     info->splited = 0;
+    info->checkNormalWin = 0;
     info->splitGame = 0;
 }
 
@@ -570,6 +581,8 @@ void saveToFile(Info *info, int money)
     FILE *file = fopen("results.txt", "r");
     FILE *tempFile = fopen("temp.txt", "w");
 
+    //Checking if username and given file are in file if yes copies it to temp 
+    //file then remove the result.txt and changes the name of temp file to result 
     while (fscanf(file, "%s %d", username, &moneyInFile) == 2) 
     {
         if (strcmp(username, info->player.name) == 0) 
@@ -623,6 +636,7 @@ void printTable(Card *pHand, Card *dHand, Info *info, int player)
     system("clear");
     printf("------------------------ \u2660\u2665 BLACKJACK \u2663\u2666 ------------------------ \n");
     printf("Dealer Cards On Hand: ");
+    //Depending on the current state of the game printing half of dealers hand or all of them
     if (player == PLAYER)
     {
         printf("%s # \n", dHand[0].face);
@@ -636,6 +650,8 @@ void printTable(Card *pHand, Card *dHand, Info *info, int player)
     printf("\n \n \n");
 
     printf("\t\t\t h - hit \t s - stand \t \n");
+
+    //Split options shows only if face of first card = face of second card or value of first = value of second and the game wasn't splited
     if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
         printf("\t\t\t\t p - split \n");
 
