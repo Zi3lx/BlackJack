@@ -1,42 +1,10 @@
-//Made by Michał Safuryn
+//Michał Safuryn
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 #include <unistd.h>
-/*
-X warunek ze dealer przegrywa jak ma więcej niż 21
-X opcja rozpoczęcia kolejnej tury bez wychodzenia z programu
-X dziala wtedy kiedy zczytywanie bez enterow
-    punkty nie powinny się pokazywać na początku - 
-    a) jak klikam H po raz pierwszy to punkty zostają takie same
-    b) po nacisnieciu stand i tak jest dodawan jeszcze jedna karta do gracza
-X przegrana powinna być automatyczna jak będę miał więcej niż 21
-X funkcje dla gameMenu 
-X naprawic Asa by był 1 i 11
-X naprawic funkcje sum dla asa
-X stworzyc opcje split
-X ala logowanie informacje w pliku i informacje o kasie itp w nim
-X naprawic as przy splicie zostaje z wartoscia 1 zmienic
-X dodac sprawdanie czy mozna obstawic dan ilosc pieniedzy
-X dodac wyglad zeby jakos wyglada
-X uporzadkowac dunkcje i napsiac funckje na gre 
-- statystyki dodac
-X walidacja register
-X uporzadkowac kod 
-X stworzyc wyglad dla gry jak ponizej 
-
-----------------------------------------
-A5                    
-11            
-  
-    h-hit       s-stand     p-split
-
-56                    
-11
-----------------------------------------
-*/
 
 #define BLACKJACK 21
 #define MAX_DECK 22
@@ -56,6 +24,7 @@ typedef struct
 {
     char name[MAX_LEN];
     int money;
+    int games;
 } Player;
 
 typedef struct 
@@ -73,6 +42,7 @@ typedef struct
     int checkNormalWin;
     int splited;
     int splitGame;
+    int doubledDown;
 } Info;
 
 void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player);
@@ -86,6 +56,7 @@ void login(Info *info, int *logged);
 void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK], int endGame);
 void hitLogic(Card *pHadn, Info *info, int aceIndex[][MAX_DECK], int *endGame);
 void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK]);
+void doubleDown(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]);
 
 void draw(Card *hand, int index, int aceIndex[][MAX_DECK], int *total, int player);
 void FirstTwoDraws(Card *hand, int aceIndex[][MAX_DECK], int *total, int player);
@@ -99,7 +70,7 @@ void devInfo(int aceIndex[][MAX_DECK], Info *info, Card *pHand, Card *dHand);
 
 void resetSplitValues(int aceIndex[][MAX_DECK], Card *pHand, Info *info, int copyOfFirst, int *endGame);
 void structVariablesInit(Info *info);
-void saveToFile(Info *info, int money);
+void saveToFile(Info *info, int money, int playedG);
 
 void showAllPlayers();
 void printHand(Card *hand, int cardOnHand);
@@ -149,7 +120,6 @@ void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player)
                 showAllPlayers();
                 break;
             case '3':
-                saveToFile(info, info->player.money);
                 end = 0;
                 break;
             default:
@@ -181,6 +151,9 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
     printTable(pHand, dHand, info, DEALER);
     if (info->splited == 0)
         checkWinner(info->pTotal, info->dTotal, info);
+
+    info->player.games = info->player.games + 1;
+    saveToFile(info, info->player.money, info->player.games);
 }
 
 void splitGameLogic(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK])
@@ -243,7 +216,7 @@ void mainLoginFunction(Info *info)
 void registerLogic(Info *info, int *logged)
 {
     int reg = 0;
-    int moneyInFile;
+    int moneyInFile, gamesPlayed;
     char username[MAX_LEN];
     FILE *r_file = fopen("results.txt", "r");
 
@@ -269,7 +242,7 @@ void registerLogic(Info *info, int *logged)
     }
     else 
     {
-        while (fscanf(r_file, "%s %d", username, &moneyInFile) == 2)
+        while (fscanf(r_file, "%s %d %d", username, &moneyInFile, &gamesPlayed) == 3)
         {
             if (strcmp(info->player.name, username) == 0)
             {
@@ -279,10 +252,14 @@ void registerLogic(Info *info, int *logged)
             }
         }
     }
+
     if (reg == 0)
     {
+        printf("Register successful\n");
+        sleep(1);
         info->player.money = 1000;
-        saveToFile(info, info->player.money);
+        info->player.games = 0;
+        saveToFile(info, info->player.money, info->player.games);
         *logged = 0;
     }
     fclose(r_file);
@@ -290,7 +267,7 @@ void registerLogic(Info *info, int *logged)
 
 void login(Info *info, int *logged)
 {
-    int moneyInFile;
+    int moneyInFile, gamesPlayed;
     char username[MAX_LEN];
     int loggedIn = 0;
     FILE *r_file = fopen("results.txt", "r");
@@ -305,12 +282,14 @@ void login(Info *info, int *logged)
     scanf("%29s", info->player.name);
 
     //Check if username is in file if yes you can login
-    while (fscanf(r_file, "%s %d", username, &moneyInFile) == 2)
+    while (fscanf(r_file, "%s %d %d", username, &moneyInFile, &gamesPlayed) == 3)
     {
         if (strcmp(info->player.name, username) == 0)
         {
             printf("You have logged in \n");
+            sleep(1);
             info->player.money = moneyInFile;
+            info->player.games = gamesPlayed;
             fclose(r_file);
             loggedIn = 1;
             *logged = 0;
@@ -359,6 +338,14 @@ void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]
                     endGame = 0;
                 }
                 break;
+            case 'd':
+                if (info->splited == 0 && info->pIndex == 2)
+                {
+                    doubleDown(pHand, dHand, info, aceIndex);
+                    if (info->pIndex == 3)
+                        endGame = 0;
+                }
+                break;
             default:
                 printTable(pHand, dHand, info, PLAYER);
                 break;
@@ -371,7 +358,6 @@ void hitLogic(Card *pHand, Info *info, int aceIndex[][MAX_DECK], int *endGame)
 {
     draw(pHand, info->pIndex, aceIndex, &info->pTotal, PLAYER);
     info->pIndex++;
-    info->splited = 1;
     if (info->pTotal > BLACKJACK)
         *endGame = 0;
 }
@@ -385,6 +371,21 @@ void standLogic(Card *dHand, Info *info, int aceIndex[][MAX_DECK])
     }
 }
 
+void doubleDown(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK])
+{
+    //Check if you can double 
+    if (info->moneyBet * 2 > info->player.money)
+    {
+        printf("Not enough money to double \n");
+        return;
+    } 
+    else
+    {
+        draw(pHand, info->pIndex, aceIndex, &info->pTotal, PLAYER);
+        info->pIndex++;
+        info->doubledDown = 1;
+    }
+}
 
 void draw(Card *hand, int index, int aceIndex[][MAX_DECK] ,int *total, int player)
 {
@@ -433,8 +434,10 @@ void FirstTwoDraws(Card *hand,int aceIndex[][MAX_DECK], int *total, int player)
 
 void checkWinner(int total, int dTotal, Info *info)
 {
+    if (info->doubledDown == 1)
+        info->moneyBet *= 2;
     //Checks all game options to win or lose
-    if (info->pTotal > BLACKJACK)
+    if (total > BLACKJACK)
     {
         printf("You Bust with %d points, dealer wins. You lose %d$\n", total, info->moneyBet);
         info->player.money -= info->moneyBet;
@@ -569,13 +572,14 @@ void structVariablesInit(Info *info)
     info->pTotal = 0;
     info->dTotal = 0;
     info->splited = 0;
+    info->doubledDown = 0;
     info->checkNormalWin = 0;
     info->splitGame = 0;
 }
 
-void saveToFile(Info *info, int money)
+void saveToFile(Info *info, int money, int playedG)
 {
-    int moneyInFile;
+    int moneyInFile, gamesPlayed;
     char username[MAX_LEN];
     int playerExist = 0;
     FILE *file = fopen("results.txt", "r");
@@ -583,18 +587,19 @@ void saveToFile(Info *info, int money)
 
     //Checking if username and given file are in file if yes copies it to temp 
     //file then remove the result.txt and changes the name of temp file to result 
-    while (fscanf(file, "%s %d", username, &moneyInFile) == 2) 
+    while (fscanf(file, "%s %d %d", username, &moneyInFile, &gamesPlayed) == 3) 
     {
         if (strcmp(username, info->player.name) == 0) 
         {
             moneyInFile = money;
+            gamesPlayed = playedG;
             playerExist = 1;
         }
-        fprintf(tempFile, "%s %d\n", username, moneyInFile);
+        fprintf(tempFile, "%s %d %d\n", username, moneyInFile, gamesPlayed);
     }
     if (!playerExist) 
     {
-        fprintf(tempFile, "%s %d\n", info->player.name, money);
+        fprintf(tempFile, "%s %d %d\n", info->player.name, money, playedG);
     }
     
     fclose(file);
@@ -607,15 +612,14 @@ void showAllPlayers()
 {
     FILE *file = fopen("results.txt", "r");
     char username[MAX_LEN], k;
-    int cash, index = 1;
+    int cash, index = 1, gamesPlayed;
  
     system("clear");
     printf("Press E to exit \n");
-    printf("Player Name \t Money\n");
-    
-    while (fscanf(file, "%s %d", username, &cash) == 2)
+    printf("  %-20s %-8s %-12s\n", "PlayerName", "Money", "GamesPlayed");    
+    while (fscanf(file, "%s %d %d", username, &cash, &gamesPlayed) == 3)
     {
-        printf("%d. %s \t %d\n", index, username, cash);
+        printf("%d. %-20s %-8d %-12d\n", index, username, cash, gamesPlayed);
         index++;
     }
     while (k != 'e')
@@ -623,6 +627,7 @@ void showAllPlayers()
     
     fclose(file);
 }
+
 void printHand(Card *hand, int cardOnHand)
 {
     for (int i = 0; i < cardOnHand; i++)
@@ -649,11 +654,12 @@ void printTable(Card *pHand, Card *dHand, Info *info, int player)
     }
     printf("\n \n \n");
 
-    printf("\t\t\t h - hit \t s - stand \t \n");
-
+    printf("\t h - hit \t s - stand");
+    if (info->splited == 0)
+        printf("\t d - double \n");
     //Split options shows only if face of first card = face of second card or value of first = value of second and the game wasn't splited
     if ((pHand[0].face == pHand[1].face || pHand[0].value == pHand[1].value) && info->splited == 0)
-        printf("\t\t\t\t p - split \n");
+        printf("\t\t\t p - split \n");
 
     printf("\n \n \n");
     printf("Total Player Points: %d \n", info->pTotal);

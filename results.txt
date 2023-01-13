@@ -1,6 +1,3 @@
-asd 570
-aaa 1000
-janusz_uru 1000
-tututuutututut 1000
-qwer 999
-alfa 1000
+asd 1000 2
+ala 298 47
+oppo 1000 0
