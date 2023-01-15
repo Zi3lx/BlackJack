@@ -6,7 +6,7 @@ void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player)
     char k;
 
     mainLoginFunction(info);
-    sleep(1);
+
     while (end)
     {   
         printf("1 - Play BlackJack \n");
@@ -57,6 +57,9 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
         if (info->splited == 0)
             checkWinner(info->pTotal, info->dTotal, info);
     }
+    else 
+        sleep(3);   //Sleep to see the score
+    
     info->player.games = info->player.games + 1;
     saveToFile(info);
 }
@@ -113,6 +116,7 @@ void mainLoginFunction(Info *info)
                 exit(1);
                 break;
         }
+        sleep(1);
     }    
 }
 void registerLogic(Info *info, int *logged)
@@ -158,7 +162,6 @@ void registerLogic(Info *info, int *logged)
     if (reg == 0)
     {
         printf("Register successful\n");
-        sleep(1);
         info->player.money = 1000;
         info->player.games = 0;
         info->player.wonGames = 0;
@@ -189,7 +192,6 @@ void login(Info *info, int *logged)
         if (strcmp(info->player.name, username) == 0)
         {
             printf("You have logged in \n");
-            sleep(1);
             info->player.money = moneyInFile;
             info->player.games = gamesPlayed;
             info->player.wonGames = wonGames;
@@ -363,7 +365,7 @@ void checkWinner(int total, int dTotal, Info *info)
 }
 void checkSplitWinners(int total, Info *info)
 {
-    printf("Dealer Points: %d\n", total);
+    printf("Dealer Points: %d\n", info->dTotal);
     printf("First Game: \n");   
     checkWinner(total, info->dTotal, info);
     printf("Second Game: \n");   
@@ -375,16 +377,14 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame, Info *info)
     if (pTotal == BLACKJACK && dTotal == BLACKJACK)
     {
         printf("Draw, Dealer and you have BLACKJACK. You earn 0$\n");
-        sleep(3);
         *endGame = 0;
     }
     else if (pTotal == BLACKJACK)
     {
-        printf("You Win, BLACKJACK. You earn %d\n", (int)(1.5 * info->moneyBet));
+        printf("You Win, BLACKJACK. You earn %d$\n", (int)(1.5 * info->moneyBet));
         info->player.money += (int)(1.5 * info->moneyBet);
         info->player.wonGames = info->player.wonGames + 1;
         info->gotBlackJack = 1;
-        sleep(3);
         *endGame = 0;
     }
     else if (dTotal == BLACKJACK)
@@ -392,7 +392,6 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame, Info *info)
         printf("You Lose, Dealer has BLACKJACK \n");
         info->player.money -= info->moneyBet;
         info->gotBlackJack = 1;
-        sleep(3);
         *endGame = 0;
     }
 }
