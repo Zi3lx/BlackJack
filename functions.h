@@ -44,7 +44,7 @@ typedef struct
     int checkNormalWin;
     int splited;
     int splitGame;
-    int blackJack;
+    int gotBlackJack;
     int doubledDown;
 } Info;
 

@@ -6,7 +6,7 @@ void mainMenu(Card *pHand, Card *dHand, Info *info, Player *player)
     char k;
 
     mainLoginFunction(info);
-
+    sleep(1);
     while (end)
     {   
         printf("1 - Play BlackJack \n");
@@ -49,12 +49,14 @@ void gameLogic(Card *pHand, Card *dHand, Info *info, Player *player)
     printTable(pHand, dHand, info, PLAYER);
     checkIfBlackJack(info->pTotal, info->dTotal, &endGame, info);
 
-    mainGameLoop(pHand, dHand, info, aceIndex, endGame);
+    if (info->gotBlackJack == 0)
+    {
+        mainGameLoop(pHand, dHand, info, aceIndex, endGame);
 
-    printTable(pHand, dHand, info, DEALER);
-    if (info->splited == 0 && info->blackJack == 0)
-        checkWinner(info->pTotal, info->dTotal, info);
-
+        printTable(pHand, dHand, info, DEALER);
+        if (info->splited == 0)
+            checkWinner(info->pTotal, info->dTotal, info);
+    }
     info->player.games = info->player.games + 1;
     saveToFile(info);
 }
@@ -381,6 +383,7 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame, Info *info)
         printf("You Win, BLACKJACK. You earn %d\n", (int)(1.5 * info->moneyBet));
         info->player.money += (int)(1.5 * info->moneyBet);
         info->player.wonGames = info->player.wonGames + 1;
+        info->gotBlackJack = 1;
         sleep(3);
         *endGame = 0;
     }
@@ -388,10 +391,10 @@ void checkIfBlackJack(int pTotal, int dTotal, int *endGame, Info *info)
     {
         printf("You Lose, Dealer has BLACKJACK \n");
         info->player.money -= info->moneyBet;
+        info->gotBlackJack = 1;
         sleep(3);
         *endGame = 0;
     }
-    info->blackJack = 1;
 }
 void checkBetMoney(Info *info)
 {
@@ -468,7 +471,7 @@ void structVariablesInit(Info *info)
     info->splited = 0;
     info->doubledDown = 0;
     info->checkNormalWin = 0;
-    info->blackJack = 0;
+    info->gotBlackJack = 0;
     info->splitGame = 0;
 }
 void saveToFile(Info *info)
