@@ -247,7 +247,10 @@ void mainGameLoop(Card *pHand, Card *dHand, Info *info, int aceIndex[][MAX_DECK]
                 {
                     doubleDown(pHand, dHand, info, aceIndex);
                     if (info->pIndex == 3)
+                    {
                         endGame = 0;
+                        standLogic(dHand, info, aceIndex);
+                    }
                 }
                 break;
             default:
